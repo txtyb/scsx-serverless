@@ -1,8 +1,6 @@
-from datetime import date
-from certifi import contents
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os, requests
+import os, requests, json
 
 SCSX_TOKEN = os.environ['SCSX_TOKEN']
 SCSX_HOST = os.environ['SCSX_HOST']
@@ -23,6 +21,7 @@ def getDevice():
 
     n = request.args.get('n', type=int, default=10)
     devEui = request.args.get('devEui', type=str, default=None)
+    typeArg = request.args.get('type', type=int, default=0)
 
     params = {
         'page': 0, 
@@ -42,14 +41,14 @@ def getDevice():
     elif resDate['msg'] == '请求成功':
         # reverse to make the last the latest
         content = resDate['data']['content'][::-1]
-        dateUpList = list()
-        dateType = ['光照', '气压', '温度', '湿度']
+        dataUpList = list()
+        dataType = ['光照', '温度', '湿度', '气压']
         for i in content:
             if i['mtypeText'] == 'CONFIRMED_DATA_UP':
                 payloadData = i['payloadData']
                 if isDataValid(payloadData):
                     dataUp = dict()
-                    dataUp['type'] = dateType[int(payloadData[7])-1]
+                    dataUp['type'] = dataType[int(payloadData[7])-1]
                     dataUp['timestamp'] = i['serverTimeMillis']
                     dataUp['time'] = i['serverTime']
                     dataUp['data'] = i['payloadData']
@@ -57,9 +56,15 @@ def getDevice():
                     hexStr2 = '0x' + payloadData[14:16]
                     dataUp['value'] = float.fromhex(hexStr1) + (float.fromhex(hexStr2)*0.01)
 
-                    dateUpList.append(dataUp)
+                    dataUpList.append(dataUp)
 
-        return jsonify(dateUpList)
+        chartData = list()
+        chartData.append(['Time', dataType[typeArg]])
+        for i in dataUpList:
+            if i['type'] == dataType[typeArg]:
+                chartData.append([i['timestamp'], i['value']])
+
+        return jsonify(chartData)
 
 if __name__ == '__main__':
     app.run()
